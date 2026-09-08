@@ -86,7 +86,7 @@ silently uploading under a text you didn't read.
 | per session | usable tokens × weight ÷ 1000 pt (weight 1.0 if the semantic check passes, else 0.7) |
 | minimum | 3 turns, 500 usable tokens, repeat ratio ≤ 60 % |
 | bonuses | first accepted donation +50 pt · founding member (first 100, GitHub ≥ 30 days) +300 pt |
-| limits | 10 uploads / hour · 5 rejections in a row locks donations for 24 h |
+| limits | 50 requests / hour per account (≤5 sessions each) · 5 rejections in a row locks donations for 24 h |
 
 Full rules and the API for other harnesses: <https://opendatareasoninghub.org/donate>
 

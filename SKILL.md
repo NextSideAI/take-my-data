@@ -43,26 +43,36 @@ Anything else: treat it as free-text intent and pick the closest command.
    - what was redacted (the `redacted` column) and that tool outputs are truncated and unscored
    - which rows were skipped and why (active / too small / low quality / already donated)
 
-3. **Ask for consent — and wait.** The question must name the license the preview printed, e.g.
+3. **Review the masked transcripts before asking to upload.** For every row that may be uploaded,
+   run `dump <n>` and inspect the complete sanitized text yourself. Check that apparent secrets,
+   personal identifiers, credentials, private URLs, and other sensitive values are replaced or
+   safely truncated. Do not paste the dump into the conversation. Tell the user that you reviewed
+   the masked version and flag any residual sensitive-looking content you find. If a selected row
+   appears insufficiently masked, do not include it in the upload; explain why and re-run
+   `preview` with only the remaining rows. This is a safety review, not a guarantee that no
+   sensitive data remains.
+
+4. **Ask for consent — and wait.** The question must name the license the preview printed, e.g.
    "Upload these N sessions to opendatareasoninghub.org? They will be dedicated to the public domain
    under CC0 1.0 and published in the open dataset (with your GitHub handle unless your account is
    anonymous)." Offer `dump <n>` if they want to read one in full first. Do **not** proceed on
    silence, on "ok" to something else, or on a previous conversation's approval. If they want to
    exclude rows, re-run `preview` and use `--pick 1,3` in the next step to name only the approved rows.
 
-4. **Upload only after an explicit yes.** Run `donate --yes --pick <rows>` (plus `--all` if used
+5. **Upload only after an explicit yes.** Run `donate --yes --pick <rows>` (plus `--all` if used
    in the preview). Relay each result line: points, the completion-card URL, and rank changes.
    `rejected DUPLICATE` means someone (possibly the user, elsewhere) already donated that session;
-   `rate_limited` means the hourly cap (10 uploads) was reached — say when to retry.
+   `rate_limited` means the hourly cap (50 requests per account; each request carries up to 5 sessions) was reached — relay the retry time it reports. Do not stop early on your own: the client batches and reports; only an actual `rate_limited` line means the cap was hit.
 
-5. **Withdraw** (`withdraw <id>`): confirm the id with the user, run it, relay the result.
+6. **Withdraw** (`withdraw <id>`): confirm the id with the user, run it, relay the result.
    Withdrawal reverses the points in the ledger and purges the transcript; the session hash stays
    claimed so it cannot be re-uploaded.
 
 ## Hard rules
 
 - Never pass `--yes` without an explicit, current confirmation from the user in this conversation,
-  given after they saw the license line. The upload echoes that license id; if the hub answers
+  given after they saw the license line **and after you inspected the complete masked text for
+  every row being uploaded**. The upload echoes that license id; if the hub answers
   `license_required`, the license changed — show the new one and ask again, never retry silently.
 - Never edit the transcripts, the sanitizer, or the hash before upload to change the score.
 - Never paste the raw (unsanitized) session logs into the conversation; use `dump <n>`, which prints

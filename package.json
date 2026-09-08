@@ -1,6 +1,6 @@
 {
   "name": "take-my-data",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Claude Code skill: donate your reasoning sessions to OpenDataReasoningHub, sanitized locally, with explicit consent.",
   "type": "module",
   "private": true,

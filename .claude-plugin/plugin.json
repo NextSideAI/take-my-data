@@ -1,6 +1,6 @@
 {
   "name": "take-my-data",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Donate your Claude Code reasoning sessions to OpenDataReasoningHub — sanitized locally, uploaded only with explicit consent.",
   "author": { "name": "OpenDataReasoningHub" },
   "homepage": "https://opendatareasoninghub.org/donate",
