@@ -1,0 +1,27 @@
+{
+  "name": "take-my-data",
+  "version": "0.1.0",
+  "description": "Claude Code skill: donate your reasoning sessions to OpenDataReasoningHub, sanitized locally, with explicit consent.",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "take-my-data": "scripts/donate.mjs"
+  },
+  "scripts": {
+    "preview": "node scripts/donate.mjs preview",
+    "test": "node --test test/sanitize.test.mjs"
+  },
+  "engines": {
+    "node": ">=18.3"
+  },
+  "repository": "github:linda1476/take-my-data",
+  "homepage": "https://opendatareasoninghub.org/donate",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "skill",
+    "dataset",
+    "reasoning",
+    "open-data"
+  ]
+}

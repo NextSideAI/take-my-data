@@ -1,0 +1,17 @@
+{
+  "name": "take-my-data",
+  "owner": { "name": "linda1476" },
+  "metadata": {
+    "description": "OpenDataReasoningHub donation skill",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "take-my-data",
+      "source": "./",
+      "description": "Donate your Claude Code reasoning sessions to OpenDataReasoningHub — sanitized locally, uploaded only with explicit consent.",
+      "version": "0.1.0",
+      "category": "productivity"
+    }
+  ]
+}

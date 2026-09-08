@@ -1,0 +1,80 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { test } from "node:test";
+import { estimatePoints, gateOf, measure, redactText, sanitizeSession } from "../scripts/lib/sanitize.mjs";
+import { parseSessionFile, projectKey, sessionHash } from "../scripts/lib/transcript.mjs";
+
+test("redacts vendor keys, kv secrets, PII and home paths", () => {
+  const out = redactText(
+    [
+      "ANTHROPIC_API_KEY=sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789",
+      "gh ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD",
+      "password: hunter2xx",
+      "kim@example.com 010-1234-5678 4111 1111 1111 1111",
+      "C:\\Users\\jiwon\\x and C:\\\\Users\\\\jiwon\\\\y and /home/kim/z",
+    ].join("\n"),
+  );
+  assert.doesNotMatch(out, /sk-ant|ghp_|hunter2|example\.com|1234-5678|4111|jiwon|kim\//);
+  assert.match(out, /C:\\Users\\<user>\\x/);
+  assert.match(out, /C:\\\\Users\\\\<user>\\\\y/);
+  assert.match(out, /\/home\/<user>\/z/);
+});
+
+test("measurement excludes tool results and gates small sessions", () => {
+  const { session } = sanitizeSession({
+    sessionId: "s",
+    transcript: [
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "hello" },
+      { role: "tool", content: "x".repeat(100_000) },
+    ],
+  });
+  const m = measure(session.transcript);
+  assert.equal(m.turns, 2);
+  assert.ok(m.usableTokens < 10);
+  assert.equal(gateOf(m), "TOO_SMALL");
+  assert.equal(estimatePoints({ usableTokens: 41_203, semanticPass: true }), 41.2);
+  assert.equal(estimatePoints({ usableTokens: 1_000, semanticPass: false }), 0.7);
+});
+
+test("hash and project key match the server / Claude Code conventions", () => {
+  const expected = createHash("sha256").update("claude_code:abc").digest("hex");
+  assert.equal(sessionHash("abc"), expected);
+  if (process.platform === "win32") assert.equal(projectKey("C:\\Users\\com\\Desktop\\open"), "C--Users-com-Desktop-open");
+  assert.ok(projectKey("/home/x/p").endsWith("-home-x-p"));
+});
+
+test("parses Claude Code JSONL: merges assistant blocks, splits tool results, drops noise", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "tmd-"));
+  const file = join(dir, "abc.jsonl");
+  const lines = [
+    { type: "summary", summary: "ignored" },
+    { type: "user", sessionId: "abc", cwd: "/home/x/p", timestamp: "2026-01-01T00:00:00Z", message: { role: "user", content: "<command-name>/model</command-name>" } },
+    { type: "user", sessionId: "abc", timestamp: "2026-01-01T00:00:01Z", message: { role: "user", content: "fix the flaky test" } },
+    { type: "assistant", sessionId: "abc", timestamp: "2026-01-01T00:00:02Z", message: { role: "assistant", model: "claude-opus-5", content: [{ type: "thinking", thinking: "look at setup" }] } },
+    { type: "assistant", sessionId: "abc", timestamp: "2026-01-01T00:00:03Z", message: { role: "assistant", model: "claude-opus-5", content: [{ type: "tool_use", name: "Read", input: { file_path: "/home/x/p/t.ts" } }] } },
+    { type: "user", sessionId: "abc", timestamp: "2026-01-01T00:00:04Z", message: { role: "user", content: [{ type: "tool_result", content: "file body" }] } },
+    { type: "assistant", sessionId: "abc", isSidechain: true, message: { role: "assistant", content: [{ type: "text", text: "subagent chatter" }] } },
+    { type: "assistant", sessionId: "abc", timestamp: "2026-01-01T00:00:05Z", message: { role: "assistant", model: "claude-opus-5", content: [{ type: "text", text: "It's a race; awaited the teardown." }] } },
+  ];
+  await writeFile(file, lines.map((l) => JSON.stringify(l)).join("\n"));
+
+  const parsed = await parseSessionFile(file);
+  assert.equal(parsed.sessionId, "abc");
+  assert.deepEqual(
+    parsed.transcript.map((t) => t.role),
+    ["user", "assistant", "tool", "assistant"],
+  );
+  assert.equal(parsed.transcript[1].thinking, "look at setup");
+  assert.equal(parsed.transcript[1].toolUses[0].name, "Read");
+  assert.equal(parsed.transcript[2].content, "file body");
+  assert.ok(!JSON.stringify(parsed).includes("subagent chatter"));
+  assert.equal(parsed.meta.model, "claude-opus-5");
+
+  const { session } = sanitizeSession(parsed);
+  assert.equal(session.meta.cwd, undefined);
+  assert.ok(session.transcript[1].toolUses[0].input.includes("<user>"));
+});
