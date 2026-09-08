@@ -66,6 +66,19 @@ subagent (sidechain) transcripts, slash-command echoes.
 Sessions are deduplicated by `sha256("claude_code:" + sessionId)`; the same file can only be
 credited once, to whoever donated it first.
 
+## License of the data you donate
+
+Uploading dedicates the sanitized sessions to the public domain under
+**[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)**. The preview prints this, the
+consent question repeats it, and the upload records the license id per donation. The sessions are
+then published in the hub's open dataset (<https://opendatareasoninghub.org/dataset>) — with your
+GitHub handle as `contributor` unless your account is set to anonymous. Withdrawing removes the
+session from every future download and lists its hash in the dataset manifest.
+
+The skill fetches the current license from `GET /api/dataset` so the text you see is the one the
+hub enforces; if it ever changes, old clients are refused with `license_required` instead of
+silently uploading under a text you didn't read.
+
 ## Scoring
 
 | | |

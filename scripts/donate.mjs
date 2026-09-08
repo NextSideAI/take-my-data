@@ -12,7 +12,7 @@
 // --yes after the human has seen the preview and explicitly agreed.
 
 import { parseArgs } from "node:util";
-import { CLIENT, api, clearToken, devLogin, deviceLogin, loadToken, resolveOrigin } from "./lib/api.mjs";
+import { CLIENT, api, clearToken, devLogin, deviceLogin, fetchLicense, loadToken, resolveOrigin } from "./lib/api.mjs";
 import { estimatePoints, gateOf, measure, sanitizeSession } from "./lib/sanitize.mjs";
 import { HARNESS, listSessionFiles, parseSessionFile, projectKey, projectsDir, sessionHash } from "./lib/transcript.mjs";
 
@@ -202,6 +202,12 @@ async function cmdPreview() {
     out("Nothing new to donate.");
   } else {
     out(`Ready: ${chosen.length} session(s), ~${fmt(tokens)} tokens, est. ${pts.toFixed(2)} pt (+50 pt first-donation bonus if this is your first).`);
+    const license = await fetchLicense(origin);
+    out("");
+    out(`License: uploading dedicates these sessions to the public domain under ${license.name}`);
+    out(`         ${license.url}`);
+    out(`         They are published in the open dataset at ${origin}/dataset, with your handle unless your account is anonymous.`);
+    out("");
     out(`Inspect one in full:   node scripts/donate.mjs dump <n>`);
     out(`Upload after consent:  node scripts/donate.mjs donate --yes${flags.all ? " --all" : ""} --pick ${chosen.map((c) => c.n).join(",")}`);
   }
@@ -263,13 +269,14 @@ async function cmdDonate() {
   }
   if (cur.length) batches.push(cur);
 
-  out(`Uploading ${chosen.length} session(s) in ${batches.length} request(s) to ${origin} as ${entry.handle ?? "you"}…`);
+  const license = await fetchLicense(origin);
+  out(`Uploading ${chosen.length} session(s) in ${batches.length} request(s) to ${origin} as ${entry.handle ?? "you"} under ${license.id}…`);
   const results = [];
   for (const batch of batches) {
     const res = await api(origin, "/api/donations", {
       method: "POST",
       token: entry.token,
-      body: { harness: HARNESS, client: CLIENT, sessions: batch.map((c) => c.it.session) },
+      body: { harness: HARNESS, client: CLIENT, license: license.id, sessions: batch.map((c) => c.it.session) },
     });
     const r = res.data ?? {};
     const label = batch.map((c) => `#${c.n}`).join(",");
@@ -277,6 +284,10 @@ async function cmdDonate() {
 
     if (res.status === 401) {
       err(`  ${label}: token rejected (401). Run login again.`);
+      break;
+    }
+    if (res.status === 400 && r.error === "license_required") {
+      err(`  ${label}: the hub now requires ${r.license?.id ?? "a different license"} (${r.license?.url ?? ""}). Re-run preview so the user can consent to it, or update the skill.`);
       break;
     }
     if (r.status === "accepted") {

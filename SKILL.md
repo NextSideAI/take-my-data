@@ -43,11 +43,12 @@ Anything else: treat it as free-text intent and pick the closest command.
    - what was redacted (the `redacted` column) and that tool outputs are truncated and unscored
    - which rows were skipped and why (active / too small / low quality / already donated)
 
-3. **Ask for consent — and wait.** Ask a direct question such as
-   "Upload these N sessions to opendatareasoninghub.org?" and offer `dump <n>` if they want to
-   read one in full first. Do **not** proceed on silence, on "ok" to something else, or on a
-   previous conversation's approval. If they want to exclude rows, re-run `preview` and use
-   `--pick 1,3` in the next step to name only the approved rows.
+3. **Ask for consent — and wait.** The question must name the license the preview printed, e.g.
+   "Upload these N sessions to opendatareasoninghub.org? They will be dedicated to the public domain
+   under CC0 1.0 and published in the open dataset (with your GitHub handle unless your account is
+   anonymous)." Offer `dump <n>` if they want to read one in full first. Do **not** proceed on
+   silence, on "ok" to something else, or on a previous conversation's approval. If they want to
+   exclude rows, re-run `preview` and use `--pick 1,3` in the next step to name only the approved rows.
 
 4. **Upload only after an explicit yes.** Run `donate --yes --pick <rows>` (plus `--all` if used
    in the preview). Relay each result line: points, the completion-card URL, and rank changes.
@@ -60,7 +61,9 @@ Anything else: treat it as free-text intent and pick the closest command.
 
 ## Hard rules
 
-- Never pass `--yes` without an explicit, current confirmation from the user in this conversation.
+- Never pass `--yes` without an explicit, current confirmation from the user in this conversation,
+  given after they saw the license line. The upload echoes that license id; if the hub answers
+  `license_required`, the license changed — show the new one and ask again, never retry silently.
 - Never edit the transcripts, the sanitizer, or the hash before upload to change the score.
 - Never paste the raw (unsanitized) session logs into the conversation; use `dump <n>`, which prints
   the sanitized version.

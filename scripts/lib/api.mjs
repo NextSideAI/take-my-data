@@ -6,7 +6,25 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export const DEFAULT_ORIGIN = "https://opendatareasoninghub.org";
-export const CLIENT = { name: "take-my-data", version: "0.1.0" };
+export const CLIENT = { name: "take-my-data", version: "0.2.0" };
+
+/** Used only if the hub can't be reached for its current license. Must match what the hub enforces. */
+export const FALLBACK_LICENSE = {
+  id: "CC0-1.0",
+  name: "CC0 1.0 Universal (Public Domain Dedication)",
+  url: "https://creativecommons.org/publicdomain/zero/1.0/",
+};
+
+/** The hub publishes the license it requires; the consent line and the upload echo it back verbatim. */
+export async function fetchLicense(origin) {
+  try {
+    const res = await api(origin, "/api/dataset");
+    if (res.ok && res.data?.license?.id) return res.data.license;
+  } catch {
+    // offline or old hub
+  }
+  return FALLBACK_LICENSE;
+}
 
 export function resolveOrigin(flag) {
   return String(flag || process.env.ODRH_ORIGIN || DEFAULT_ORIGIN).replace(/\/+$/, "");
