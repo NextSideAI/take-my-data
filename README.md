@@ -1,7 +1,7 @@
 # take-my-data
 
 Claude Code, Codex, Pi, OpenCode에서 생성한 본인의 에이전트 코딩 세션을
-**[OpenDataReasoningHub](https://opendatareasoninghub.org)**에 기부하는 에이전트 스킬입니다.
+[OpenDataReasoningHub](https://opendatareasoninghub.org)에 기부하는 에이전트 스킬입니다.
 공개 데이터셋과 개인·팀 순위표에 반영됩니다.
 
 - 비밀키, 토큰, 이메일, 전화번호, 카드 번호, 홈 디렉터리 사용자명과
