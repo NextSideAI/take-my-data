@@ -1,7 +1,7 @@
 {
   "name": "take-my-data",
-  "version": "0.2.1",
-  "description": "Claude Code skill: donate your reasoning sessions to OpenDataReasoningHub, sanitized locally, with explicit consent.",
+  "version": "0.3.0",
+  "description": "Donate Claude Code, Codex, Pi and OpenCode reasoning sessions to OpenDataReasoningHub, sanitized locally, with explicit consent.",
   "type": "module",
   "private": true,
   "bin": {
@@ -14,11 +14,14 @@
   "engines": {
     "node": ">=18.3"
   },
-  "repository": "github:linda1476/take-my-data",
+  "repository": "github:nextsideai/take-my-data",
   "homepage": "https://opendatareasoninghub.org/donate",
   "license": "MIT",
   "keywords": [
     "claude-code",
+    "codex",
+    "pi",
+    "opencode",
     "skill",
     "dataset",
     "reasoning",

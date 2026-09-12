@@ -1,91 +1,91 @@
 ---
 name: take-my-data
-description: Donate the user's Claude Code reasoning sessions to OpenDataReasoningHub (opendatareasoninghub.org). Sanitizes secrets/PII locally, shows a preview, requires explicit consent, then uploads and reports score and rank changes. Use when the user runs /take-my-data, asks to donate or contribute their sessions/transcripts, or wants to withdraw a donation.
+description: 사용자의 Claude Code, Codex, Pi, OpenCode 추론 세션을 OpenDataReasoningHub(opendatareasoninghub.org)에 기부합니다. 로컬에서 비밀·개인정보를 마스킹하고 미리보기와 명시적 동의를 받은 뒤 업로드하며, 점수와 순위 변화를 알려 줍니다. 사용자가 /take-my-data를 실행하거나 세션·대화 기부 또는 기존 기부 철회를 요청할 때 사용합니다.
 ---
 
 # take-my-data
 
-You are helping the user donate their own Claude Code sessions as open reasoning data.
-Everything runs through one script that lives next to this file:
+사용자 본인의 Claude Code, Codex, Pi, OpenCode 세션을 공개 추론 데이터로 기부하는 작업을 돕습니다.
+모든 작업은 이 파일과 같은 폴더에 있는 하나의 스크립트로 실행합니다.
 
-```
+```text
 node "<SKILL_DIR>/scripts/donate.mjs" <command> [flags]
 ```
 
-`<SKILL_DIR>` is the directory containing this SKILL.md (typically `~/.claude/skills/take-my-data`).
-Node 18+ is required; there are no dependencies.
+`<SKILL_DIR>`은 이 `SKILL.md`가 들어 있는 폴더입니다. Node.js 18.3 이상이 필요하며 외부
+패키지 의존성은 없습니다. OpenCode 세션을 찾으려면 `opencode` 명령이 `PATH`에 있어야 합니다.
 
-## Arguments
+## 인자
 
-`$ARGUMENTS` may be empty or one of:
+`$ARGUMENTS`는 비어 있거나 다음 중 하나입니다.
 
-| argument | meaning |
+| 인자 | 의미 |
 | --- | --- |
-| *(empty)* | sessions of the **current project** only |
-| `all` | sessions of every project on this machine |
-| `withdraw <id>` | take down donation `<id>` |
-| `status` / `whoami` | show who is logged in |
-| `login` | (re)authenticate |
-| `dump <n>` | print the full sanitized text of preview row `n` |
+| 비어 있음 | 현재 프로젝트의 지원 도구 세션 |
+| `all` | 이 컴퓨터의 모든 프로젝트 세션 |
+| `withdraw <id>` | 기부 `<id>` 철회 |
+| `status` / `whoami` | 로그인 계정 확인 |
+| `login` | 다시 로그인 |
+| `dump <n>` | 미리보기 `<n>`행의 정제된 전체 대화 출력 |
 
-Anything else: treat it as free-text intent and pick the closest command.
+그 밖의 문장은 자유 형식 의도로 해석해 가장 가까운 명령을 선택합니다. 사용자가 특정 도구를
+지정하면 `--harness claude_code`, `--harness codex`, `--harness pi`, 또는
+`--harness opencode`를 추가합니다. 여러 값은 쉼표로 연결합니다.
 
-## Procedure
+## 절차
 
-1. **Check login.** Run `whoami`. If it exits non-zero, run `login` and relay the printed
-   `Open <url>` / `Enter <code>` lines to the user verbatim. The command blocks until they approve
-   in the browser. If the server answers `auth_not_configured`, stop and tell the user this hub
-   has no GitHub login yet.
+1. **로그인 확인.** `whoami`를 실행합니다. 실패하면 `login`을 실행하고 출력된
+   `Open <url>`과 `Enter <code>` 줄을 사용자에게 그대로 전달합니다. 브라우저 승인이 끝날
+   때까지 명령이 기다립니다. 서버가 `auth_not_configured`를 반환하면 이 허브에 GitHub 로그인이
+   설정되지 않았다고 알리고 중단합니다.
 
-2. **Preview.** Run `preview` (add `--all` for the `all` argument). Show the user the table
-   *as printed* plus the one-line first-message excerpts, and summarize in your own words:
-   - how many sessions are ready, total tokens and estimated points
-   - what was redacted (the `redacted` column) and that tool outputs are truncated and unscored
-   - which rows were skipped and why (active / too small / low quality / already donated)
+2. **미리보기.** `preview`를 실행합니다. `all` 요청에는 `--all`을 추가합니다. 출력된 표와
+   첫 사용자 메시지의 한 줄 발췌를 보여 주고 다음을 요약합니다.
+   - 준비된 세션 수, 전체 토큰, 예상 점수
+   - `redacted` 열에서 마스킹된 항목과 도구 출력이 잘리며 점수에서 제외된다는 사실
+   - 활성 상태, 너무 작음, 낮은 품질, 이미 기부됨 등 제외된 행과 이유
 
-3. **Review the masked transcripts before asking to upload.** For every row that may be uploaded,
-   run `dump <n>` and inspect the complete sanitized text yourself. Check that apparent secrets,
-   personal identifiers, credentials, private URLs, and other sensitive values are replaced or
-   safely truncated. Do not paste the dump into the conversation. Tell the user that you reviewed
-   the masked version and flag any residual sensitive-looking content you find. If a selected row
-   appears insufficiently masked, do not include it in the upload; explain why and re-run
-   `preview` with only the remaining rows. This is a safety review, not a guarantee that no
-   sensitive data remains.
+3. **업로드 전에 마스킹된 전체 대화 검토.** 업로드 후보 행마다 `dump <n>`을 실행해 정제된
+   전체 내용을 직접 확인합니다. 비밀, 개인 식별 정보, 인증 정보, 비공개 URL과 그 밖의 민감한
+   값이 대체되었거나 안전하게 잘렸는지 검사합니다. 덤프 전체를 대화에 붙여 넣지 않습니다.
+   마스킹본을 검토했다는 사실을 알리고 남아 있는 민감해 보이는 내용을 명시합니다. 마스킹이
+   충분하지 않은 행은 업로드에서 제외하고, 남은 행만 `--pick`으로 선택해 다시 미리 봅니다.
+   이 검토는 안전 장치이며 민감 정보가 전혀 남지 않았다는 보장은 아닙니다.
 
-4. **Ask for consent — and wait.** The question must name the license the preview printed, e.g.
-   "Upload these N sessions to opendatareasoninghub.org? They will be dedicated to the public domain
-   under CC0 1.0 and published in the open dataset (with your GitHub handle unless your account is
-   anonymous)." Offer `dump <n>` if they want to read one in full first. Do **not** proceed on
-   silence, on "ok" to something else, or on a previous conversation's approval. If they want to
-   exclude rows, re-run `preview` and use `--pick 1,3` in the next step to name only the approved rows.
+4. **동의를 요청하고 기다림.** 미리보기에 표시된 라이선스명을 질문에 포함합니다. 예:
+   “이 N개 세션을 opendatareasoninghub.org에 업로드할까요? CC0 1.0에 따라 퍼블릭 도메인으로
+   공개 데이터셋에 게시되며, 익명 계정이 아니면 GitHub 사용자명이 표시됩니다.” 사용자가 원하면
+   먼저 `dump <n>`을 읽을 수 있다고 안내합니다. 침묵, 다른 질문에 대한 “확인”, 이전 대화의
+   동의만으로 진행하지 않습니다. 제외할 행이 있으면 다시 미리 보고 다음 단계에서 승인된 행만
+   `--pick 1,3`처럼 지정합니다.
 
-5. **Upload only after an explicit yes.** Run `donate --yes --pick <rows>` (plus `--all` if used
-   in the preview). Relay each result line: points, the completion-card URL, and rank changes.
-   `rejected DUPLICATE` means someone (possibly the user, elsewhere) already donated that session;
-   `rate_limited` means the hourly cap (50 requests per account; each request carries up to 5 sessions) was reached — relay the retry time it reports. Do not stop early on your own: the client batches and reports; only an actual `rate_limited` line means the cap was hit.
+5. **현재 대화에서 명시적으로 동의한 뒤에만 업로드.**
+   `donate --yes --pick <rows>`를 실행하고 필요하면 `--all` 및 동일한 `--harness` 값을
+   유지합니다. 각 결과의 점수, 완료 카드 주소, 순위 변화를 전달합니다.
+   `rejected DUPLICATE`는 같은 세션이 이미 기부되었다는 뜻입니다. `rate_limited`는 시간당
+   한도에 도달했다는 뜻이므로 출력된 재시도 시간을 전달합니다. 실제 `rate_limited` 결과가
+   나오기 전에는 임의로 중단하지 않습니다.
 
-6. **Withdraw** (`withdraw <id>`): confirm the id with the user, run it, relay the result.
-   Withdrawal reverses the points in the ledger and purges the transcript; the session hash stays
-   claimed so it cannot be re-uploaded.
+6. **철회.** `withdraw <id>` 요청은 사용자에게 식별자를 확인받은 뒤 실행하고 결과를 전달합니다.
+   철회하면 원장의 점수가 취소되고 대화가 삭제되며, 세션 해시는 재업로드되지 않도록 유지됩니다.
 
-## Hard rules
+## 필수 규칙
 
-- Never pass `--yes` without an explicit, current confirmation from the user in this conversation,
-  given after they saw the license line **and after you inspected the complete masked text for
-  every row being uploaded**. The upload echoes that license id; if the hub answers
-  `license_required`, the license changed — show the new one and ask again, never retry silently.
-- Never edit the transcripts, the sanitizer, or the hash before upload to change the score.
-- Never paste the raw (unsanitized) session logs into the conversation; use `dump <n>`, which prints
-  the sanitized version.
-- The token lives in `~/.odrh/tokens.json`. Never print it.
-- Use `--origin <url>` (or `ODRH_ORIGIN`) only if the user asked to target a different hub.
+- 사용자가 라이선스를 본 뒤, 업로드할 모든 행의 마스킹된 전체 내용을 검토한 뒤, 현재 대화에서
+  명시적으로 동의하지 않았다면 절대로 `--yes`를 전달하지 않습니다. 허브가 `license_required`를
+  반환하면 새 라이선스를 보여 주고 다시 동의를 받아야 하며 자동으로 재시도하지 않습니다.
+- 점수를 바꾸기 위해 대화, 마스킹 규칙 또는 해시를 수정하지 않습니다.
+- 원본 세션 로그를 대화에 붙여 넣지 않습니다. 정제된 내용만 출력하는 `dump <n>`을 사용합니다.
+- 토큰은 `~/.odrh/tokens.json`에 있습니다. 절대로 출력하지 않습니다.
+- 사용자가 다른 허브를 요청한 경우에만 `--origin <url>` 또는 `ODRH_ORIGIN`을 사용합니다.
+- `preview`, `dump`, `donate` 사이에 `--all`과 `--harness` 선택을 동일하게 유지해 행 번호가
+  다른 세션을 가리키지 않도록 합니다.
 
-## Scoring, briefly (so you can answer questions)
+## 점수 요약
 
-- One session = sanitized usable tokens × weight ÷ 1000 points; weight 1.0 if the semantic check
-  passes, 0.7 otherwise. Tool results are never counted.
-- Minimum to be accepted: 3 conversation turns and 500 usable tokens; repeat ratio ≤ 60 %.
-- First accepted donation: +50 pt. Founding member (first 100, GitHub account ≥ 30 days): +300 pt.
-- Each session is credited once, to whoever donated it first.
-- Contributions are recorded against the team the user is in **at that moment**; moving teams later
-  does not move past points.
+- 세션 점수는 정제된 사용 가능 토큰 × 가중치 ÷ 1,000입니다. 의미 품질 검사 통과 시 가중치는
+  1.0, 그 외에는 0.7입니다. 도구 결과는 점수에 포함되지 않습니다.
+- 승인 최소 기준은 대화 3턴, 사용 가능 토큰 500개, 반복 비율 60% 이하입니다.
+- 첫 승인 기부는 50점, 조건을 충족한 초기 100명은 창립 멤버 보너스 300점을 받습니다.
+- 각 세션은 최초 기부자에게 한 번만 인정됩니다.
+- 기부 점수는 기부 당시 소속 팀에 기록되며, 나중에 팀을 옮겨도 이전 점수는 이동하지 않습니다.

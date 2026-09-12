@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// take-my-data — donate Claude Code sessions to OpenDataReasoningHub.
+// take-my-data — donate Claude Code, Codex, Pi and OpenCode sessions to OpenDataReasoningHub.
 //
 //   node scripts/donate.mjs login [--dev <handle>]
 //   node scripts/donate.mjs preview [--all] [--pick 1,3] [--include-active] [--limit 20]
@@ -14,7 +14,7 @@
 import { parseArgs } from "node:util";
 import { CLIENT, api, clearToken, devLogin, deviceLogin, fetchLicense, loadToken, resolveOrigin } from "./lib/api.mjs";
 import { estimatePoints, gateOf, measure, sanitizeSession } from "./lib/sanitize.mjs";
-import { HARNESS, listSessionFiles, parseSessionFile, projectKey, projectsDir, sessionHash } from "./lib/transcript.mjs";
+import { harnessLabel, listSessionFiles, normalizeHarnesses, parseSessionFile, sessionHash } from "./lib/transcript.mjs";
 
 const ACTIVE_WINDOW_MS = 10 * 60 * 1000; // a file touched in the last 10 min is probably still running
 const MAX_SESSIONS_PER_REQUEST = 5;
@@ -32,6 +32,7 @@ const { values: flags, positionals } = parseArgs({
     json: { type: "boolean", default: false },
     dev: { type: "string" },
     label: { type: "string" },
+    harness: { type: "string" },
     help: { type: "boolean", short: "h", default: false },
   },
 });
@@ -88,7 +89,8 @@ async function requireToken() {
 /** Find, parse, sanitize and measure candidate sessions. Nothing leaves the machine except hash checks. */
 async function collect({ withCheck }) {
   const limit = Math.max(1, Number(flags.limit) || 20);
-  const files = await listSessionFiles({ all: flags.all, cwd: process.cwd() });
+  const harnesses = normalizeHarnesses(flags.harness);
+  const files = await listSessionFiles({ all: flags.all, cwd: process.cwd(), harnesses, limit });
   const now = Date.now();
   const items = [];
   let n = 0;
@@ -99,13 +101,13 @@ async function collect({ withCheck }) {
     items.push(item);
     n++;
 
-    if (now - file.mtimeMs < ACTIVE_WINDOW_MS && !flags["include-active"]) {
+    if ((file.active || now - file.mtimeMs < ACTIVE_WINDOW_MS) && !flags["include-active"]) {
       item.status = "active";
       continue;
     }
     let parsed;
     try {
-      parsed = await parseSessionFile(file.path);
+      parsed = await parseSessionFile(file);
     } catch (e) {
       item.status = "unreadable";
       item.error = e.message;
@@ -118,7 +120,8 @@ async function collect({ withCheck }) {
     const { session, report } = sanitizeSession(parsed);
     item.session = session;
     item.report = report;
-    item.hash = sessionHash(session.sessionId);
+    item.harness = file.harness;
+    item.hash = sessionHash(session.sessionId, file.harness);
     item.measured = measure(session.transcript);
     item.points = estimatePoints(item.measured);
     item.gate = gateOf(item.measured);
@@ -149,11 +152,12 @@ async function collect({ withCheck }) {
 }
 
 function printTable(items) {
-  const scope = flags.all ? `all projects under ${projectsDir()}` : `${projectsDir()}/${projectKey(process.cwd())}`;
-  out(`Scanning ${scope}`);
+  const sources = normalizeHarnesses(flags.harness).map(harnessLabel).join(", ");
+  const scope = flags.all ? "all projects" : `current project (${process.cwd()})`;
+  out(`Scanning ${scope} · ${sources}`);
   out("");
   out(
-    [pad("#", 3, true), pad("session", 10), pad("date", 10), pad("turns", 5, true), pad("tokens", 9, true), pad("pass", 4), pad("est.pt", 8, true), pad("redacted", 26), "status"].join("  "),
+    [pad("#", 3, true), pad("harness", 8), pad("session", 10), pad("date", 10), pad("turns", 5, true), pad("tokens", 9, true), pad("pass", 4), pad("est.pt", 8, true), pad("redacted", 26), "status"].join("  "),
   );
   items.forEach((it, idx) => {
     const m = it.measured;
@@ -161,7 +165,8 @@ function printTable(items) {
     out(
       [
         pad(idx + 1, 3, true),
-        pad((it.session?.sessionId ?? it.file.path.split(/[\\/]/).pop()).slice(0, 8) + "…", 10),
+        pad(harnessLabel(it.file.harness), 8),
+        pad((it.session?.sessionId ?? it.file.sessionId ?? it.file.path.split(/[\\/]/).pop()).slice(0, 8) + "…", 10),
         pad(date, 10),
         pad(m ? m.turns : "", 5, true),
         pad(m ? fmt(m.usableTokens) : "", 9, true),
@@ -190,7 +195,7 @@ async function cmdPreview() {
   out(`take-my-data ${CLIENT.version} · ${origin} · ${entry?.handle ? `logged in as ${entry.handle}` : "not logged in"}`);
   const items = await collect({ withCheck: true });
   if (!items.length) {
-    out("No Claude Code sessions found for this project. Try --all, or run from the project directory.");
+    out("No supported sessions found for this project. Try --all, --harness <name>, or run from the project directory.");
     return;
   }
   printTable(items);
@@ -208,10 +213,11 @@ async function cmdPreview() {
     out(`         ${license.url}`);
     out(`         They are published in the open dataset at ${origin}/dataset, with your handle unless your account is anonymous.`);
     out("");
-    out(`Inspect one in full:   node scripts/donate.mjs dump <n>`);
-    out(`Upload after consent:  node scripts/donate.mjs donate --yes${flags.all ? " --all" : ""} --pick ${chosen.map((c) => c.n).join(",")}`);
+    const scopeFlags = `${flags.all ? " --all" : ""}${flags.harness ? ` --harness ${flags.harness}` : ""}`;
+    out(`Inspect one in full:   node scripts/donate.mjs dump <n>${scopeFlags}`);
+    out(`Upload after consent:  node scripts/donate.mjs donate --yes${scopeFlags} --pick ${chosen.map((c) => c.n).join(",")}`);
   }
-  if (items.some((i) => i.status === "active")) out(`(sessions modified in the last 10 minutes are skipped; add --include-active to include them)`);
+  if (items.some((i) => i.status === "active")) out(`(active sessions are skipped; add --include-active to include them)`);
   if (flags.json) out(JSON.stringify({ origin, items: items.map(({ file, ...rest }) => ({ path: file.path, ...rest, session: undefined })) }, null, 2));
 }
 
@@ -259,7 +265,7 @@ async function cmdDonate() {
   let curBytes = 0;
   for (const c of chosen) {
     const bytes = Buffer.byteLength(JSON.stringify(c.it.session));
-    if (cur.length && (cur.length >= MAX_SESSIONS_PER_REQUEST || curBytes + bytes > MAX_REQUEST_BYTES)) {
+    if (cur.length && (cur[0].it.harness !== c.it.harness || cur.length >= MAX_SESSIONS_PER_REQUEST || curBytes + bytes > MAX_REQUEST_BYTES)) {
       batches.push(cur);
       cur = [];
       curBytes = 0;
@@ -276,7 +282,7 @@ async function cmdDonate() {
     const res = await api(origin, "/api/donations", {
       method: "POST",
       token: entry.token,
-      body: { harness: HARNESS, client: CLIENT, license: license.id, sessions: batch.map((c) => c.it.session) },
+      body: { harness: batch[0].it.harness, client: CLIENT, license: license.id, sessions: batch.map((c) => c.it.session) },
     });
     const r = res.data ?? {};
     const label = batch.map((c) => `#${c.n}`).join(",");
@@ -352,7 +358,7 @@ async function cmdLogout() {
 }
 
 function help() {
-  out(`take-my-data ${CLIENT.version} — donate Claude Code sessions to ${origin}
+  out(`take-my-data ${CLIENT.version} — donate Claude Code, Codex, Pi and OpenCode sessions to ${origin}
 
   login [--dev <handle>]                  GitHub device-code login (stores a token in ~/.odrh)
   preview [--all] [--pick 1,3] [--limit N] [--include-active]
@@ -363,6 +369,7 @@ function help() {
   whoami | logout
 
   --origin <url> / ODRH_ORIGIN            Talk to a different hub (e.g. http://localhost:3000)
+  --harness <names>                       Limit sources (claude_code,codex,pi,opencode)
   --json                                  Append machine-readable output`);
 }
 

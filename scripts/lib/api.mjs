@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export const DEFAULT_ORIGIN = "https://opendatareasoninghub.org";
-export const CLIENT = { name: "take-my-data", version: "0.2.0" };
+export const CLIENT = { name: "take-my-data", version: "0.3.0" };
 
 /** Used only if the hub can't be reached for its current license. Must match what the hub enforces. */
 export const FALLBACK_LICENSE = {
